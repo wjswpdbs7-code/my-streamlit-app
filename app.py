@@ -5,11 +5,11 @@ import streamlit as st
 from openai import OpenAI
 
 # OpenAI 클라이언트 생성
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = OpenAI()
 
 # 페이지 설정
 st.set_page_config(page_title="텍스트 음성 변환", page_icon="🔊")
-st.title("🔊 텍스트 음성 변환")
+st.title("🔊 텍스트 → 음성 변환 실습")
 
 # 텍스트 입력
 text = st.text_area(
@@ -18,18 +18,18 @@ text = st.text_area(
 )
 
 # 버튼
-if st.button("음성으로 변환"):
+if st.button("음성 생성"):
     if text.strip() == "":
-        st.warning("읽을 텍스트를 입력해 주세요.")
+        st.warning("텍스트를 입력하세요")
     else:
         # TTS 생성
         speech = client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
+            model="gpt-4o-mini-tts",
+            voice="nova",
             input=text
         )
         audio_bytes = speech.content
 
         # 음성 출력
         st.markdown("### 🔊 음성 재생")
-        st.audio(audio_bytes, format="audio/mp3")
+        st.audio(speech.content, format="audio/mp3")
