@@ -1,5 +1,5 @@
-streamlit>=1.40,<2
-openai>=1.75,<4
+streamlit==1.66.1
+openai==3.44.0
 pandas>=2.2,<3
 openpyxl>=3.1,<4
 python-pptx>=1.0,<2
@@ -9,3 +9,4 @@ cryptography>=43
 Pillow>=10,<13
 reportlab>=4,<5
 tzdata>=2024.1
+pyarrow==24.0.0

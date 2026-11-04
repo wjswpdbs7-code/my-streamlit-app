@@ -6,20 +6,28 @@ from collections import Counter
 import os, io, json, re, base64, html, mimetypes, smtplib, ssl, tempfile, hashlib, uuid, zipfile
 from email.message import EmailMessage
 import streamlit as st
-from openai import OpenAI
-import pandas as pd
-from PIL import Image as PILImage, ImageOps
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from docx import Document
-from docx.shared import Pt as WordPt
-from openpyxl.styles import Font, PatternFill, Alignment
-from pypdf import PdfReader, PdfWriter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-from reportlab.pdfbase.ttfonts import TTFont
+print('[ABLE] app.py entered', flush=True)
+
+def load_features():
+    global OpenAI, pd, PILImage, ImageOps, Presentation, Inches, Pt, Document, WordPt
+    global Font, PatternFill, Alignment, PdfReader, PdfWriter, SimpleDocTemplate, Paragraph, Spacer
+    global ParagraphStyle, pdfmetrics, UnicodeCIDFont, TTFont
+    print('[ABLE] feature imports start', flush=True)
+    from openai import OpenAI
+    import pandas as pd
+    from PIL import Image as PILImage, ImageOps
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    from docx import Document
+    from docx.shared import Pt as WordPt
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.pdfbase.ttfonts import TTFont
+    print('[ABLE] feature imports ready', flush=True)
 
 FORMATS = ["txt", "md", "json", "csv", "xlsx", "docx", "pdf", "pptx", "png", "mp3"]
 STATUSES = ["할 일", "진행 중", "대기", "완료", "취소"]
@@ -47,7 +55,7 @@ SYS_ROLE = """
 def setting(key, default=""):
     try:
         return str(st.secrets.get(key, os.getenv(key, default)))
-    except FileNotFoundError:
+    except (FileNotFoundError, KeyError):
         return os.getenv(key, default)
 
 def load_pdf_font():
@@ -248,7 +256,7 @@ def save_artifact(item, index):
                     p.text='• '+bullet;p.font.name='맑은 고딕';p.font.size=Pt(18);p.space_after=Pt(18)
         prs.save(target)
     elif fmt == 'png':
-        response=client.images.generate(model=IMAGE_MODEL,prompt=content,size='1024x1024',quality='low',n=1,output_format='png')
+        response=client.with_options(timeout=180, max_retries=0).images.generate(model=IMAGE_MODEL,prompt=content,size='1024x1024',quality='low',n=1,output_format='png')
         if not response.data or not response.data[0].b64_json:raise ValueError('이미지 생성 응답 없음')
         data=base64.b64decode(response.data[0].b64_json)
         with PILImage.open(io.BytesIO(data)) as im:im.verify()
@@ -536,6 +544,7 @@ def render_record(record):
             elif p.suffix in ['.csv', '.xlsx']:
                 with st.expander(p.name + ' 미리보기'):
                     try:
+                        import pandas as pd
                         st.dataframe(pd.read_csv(p) if p.suffix == '.csv' else pd.read_excel(p))
                     except Exception:
                         st.caption('미리보기를 만들지 못했습니다. 다운로드해 확인하세요.')
@@ -555,6 +564,7 @@ def main():
     if not st.session_state.root:
         st.session_state.root = tempfile.mkdtemp(prefix='able_')
     root = Path(st.session_state.root)
+    print('[ABLE] rendering UI', flush=True)
     st.title('🤖 에이블 · AI 업무비서')
     st.caption('자료를 이해하고, 내 업무의 근거·기한·진행 상태를 함께 정리합니다.')
     with st.sidebar:
@@ -565,8 +575,8 @@ def main():
             TEXT_MODEL = st.text_input('대화·분석 모델', value=setting('TEXT_MODEL', 'gpt-6-luna'))
             STT_MODEL = st.text_input('음성 인식 모델', value=setting('STT_MODEL', 'gpt-transcribe'))
             TTS_MODEL = st.text_input('음성 출력 모델', value=setting('TTS_MODEL', 'tts-1'))
-            IMAGE_MODEL = st.text_input('이미지 생성 모델', value=setting('IMAGE_MODEL', 'gpt-image-1-mini'))
-            st.caption('계정에서 사용 가능한 모델 ID로 변경하세요. 음성·이미지는 기존 실습 기본값이며 지원 상태를 확인하세요.')
+            IMAGE_MODEL = st.text_input('이미지 생성 모델', value=setting('IMAGE_MODEL', 'gpt-image-2.5-sunburst'))
+            st.caption('계정에서 사용 가능한 모델 ID로 변경하세요. 이미지는 Sunburst low 설정입니다. 계정의 모델 사용 권한을 확인하세요.')
         speak = st.checkbox('답변을 음성으로도 생성', value=True)
         st.caption('음성 생성은 추가 API 비용이 발생합니다.')
         if st.button('대화·첨부 초기화'):
@@ -577,7 +587,7 @@ def main():
         st.caption('업무는 별도로 유지됩니다. 최근 대화 5쌍을 모델에 전달합니다.')
         st.info('재접속 시 기록이 초기화될 수 있습니다. 업무 관리 탭에서 백업하세요.')
     key = setting('OPENAI_API_KEY')
-    client = OpenAI(api_key=key, timeout=120, max_retries=1) if key else None
+    client = None  # 실제 요청 시에만 SDK/문서 라이브러리 로딩
     if not key:
         st.warning('Streamlit Secrets 또는 환경 변수에 OPENAI_API_KEY를 설정하면 실행할 수 있습니다.')
     chat_tab, task_tab, guide_tab = st.tabs(['💬 요청·결과', '📋 내 업무·변경 사항', 'ℹ️ 사용 안내'])
@@ -617,6 +627,9 @@ def main():
                     request_dir.mkdir()
                     try:
                         with st.spinner('요청과 자료를 처리하고 있습니다…'):
+                            load_features()
+                            client = OpenAI(api_key=key, timeout=120, max_retries=1)
+                            print('[ABLE] request processing', flush=True)
                             prompt = prompt_text.strip()
                             if audio is not None:
                                 transcript = client.audio.transcriptions.create(
@@ -684,6 +697,7 @@ def main():
                 st.rerun()
             except (ValueError, TypeError, AttributeError):
                 st.error('유효한 에이블 업무 백업 파일이 아닙니다.')
+    print('[ABLE] UI ready', flush=True)
     with guide_tab:
         st.markdown('''**사용 예시**
 - 파일 없이: “협력사에 보낼 정중한 영문 일정 문의 메일 초안을 작성해줘. 보내지는 마.”
