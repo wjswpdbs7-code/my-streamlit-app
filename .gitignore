@@ -3,4 +3,8 @@ api_key.txt
 .env
 __pycache__/
 .ipynb_checkpoints/
-able_outputs/
+.able_data/
+*.sqlite3*
+client_secret.json
+google_credentials.private.toml
+*backup.zip
