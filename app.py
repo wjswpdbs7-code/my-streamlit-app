@@ -47,7 +47,7 @@ SYS_ROLE = """
 이전 회의와 신규·변경·취소·유지를 비교하며 새 회의에 없다는 이유만으로 업무를 취소하지 않습니다.
 제공된 대화와 저장 업무만 기억합니다. 이전 전체 대화를 기억한다고 주장하지 않습니다.
 모호한 상태 변경은 실행하지 말고 확인합니다. 상태 변경의 근거는 사용자 요청이어야 합니다.
-이메일·파일 생성·업무 변경은 코드가 처리합니다. 아직 실행하기 전에 완료했다고 말하지 않습니다.
+이메일 수신자는 앱의 EMAIL_TO 또는 GMAIL_ADDRESS로 고정되어 있습니다. 사용자에게 수신자 주소를 요구하지 마세요. 이메일 발송 여부·결과는 앱이 따로 표시하므로 답변과 checks와 음성 원고에 주소 요청이나 발송 완료 주장을 쓰지 마세요. 이메일·파일 생성·업무 변경은 코드가 처리합니다. 아직 실행하기 전에 완료했다고 말하지 않습니다.
 웹 검색과 임의 코드 실행은 제공하지 않습니다. 계산은 제공된 Python 통계만 검증된 것으로 취급합니다.
 분석 범위와 자료 인식 한계를 밝히고 사실·추측·추천을 구분합니다.
 짧은 질문은 간결하게, 복잡한 업무는 누락 없이 설명합니다. 음성 원고는 자연스러운 문장으로 씁니다.
@@ -488,7 +488,7 @@ def process(prompt, paths, request_id, speak):
             if plan['attach_originals']:
                 attachments += paths
             email = send_email(final_answer, attachments or [answer_path], request_id)
-    record = {'id': request_id, 'prompt': prompt, 'answer': final_answer,
+    record = {'id': request_id, 'prompt': prompt, 'answer': final_answer, 'speech': result['speech'],
               'files': [str(p) for p in outputs], 'audio': str(audio) if audio else None,
               'email': email, 'errors': errors, 'changes': changes}
     st.session_state.records.append(record)
@@ -528,6 +528,22 @@ def render_record(record):
         st.caption(record['email'])
         for error in record['errors']:
             st.warning(error)
+        if not record.get('audio'):
+            if st.button('🔊 음성으로 듣기', key='listen_'+record['id']):
+                try:
+                    load_features()
+                    voice_client = OpenAI(api_key=setting('OPENAI_API_KEY'), timeout=120, max_retries=0)
+                    target = Path(st.session_state.root) / ('listen_'+record['id']+'.mp3')
+                    script = record.get('speech') or record['answer'][:1500]
+                    with st.spinner('음성을 생성하고 있습니다…'):
+                        with voice_client.audio.speech.with_streaming_response.create(
+                            model=TTS_MODEL, voice='nova', input=script[:4000]) as response:
+                            response.stream_to_file(target)
+                    record['audio'] = str(target)
+                    st.session_state.autoplay_id = record['id']
+                    st.rerun()
+                except Exception as exc:
+                    st.warning('음성 생성 실패 ('+type(exc).__name__+'). 음성 모델과 계정 권한을 확인하세요.')
         if record.get('audio') and Path(record['audio']).is_file():
             st.caption('AI가 생성한 음성입니다.')
             autoplay = st.session_state.get('autoplay_id') == record['id']
@@ -554,7 +570,7 @@ def render_record(record):
 
 
 def main():
-    global client, TEXT_MODEL, STT_MODEL, TTS_MODEL, IMAGE_MODEL, request_dir, pdf_password
+    global client, TEXT_MODEL, STT_MODEL, TTS_MODEL, IMAGE_MODEL, request_dir, pdf_password, SYS_ROLE
     st.set_page_config(page_title='에이블 · AI 업무비서', page_icon='🤖', layout='wide')
     defaults = {'history': [], 'tasks': [], 'records': [], 'changes': [], 'mail_attempts': {},
                 'previous_outputs': [], 'sources': [], 'processed': [], 'last_submission': '',
@@ -566,43 +582,60 @@ def main():
         st.session_state.root = tempfile.mkdtemp(prefix='able_')
     root = Path(st.session_state.root)
     print('[ABLE] rendering UI', flush=True)
-    st.title('🤖 에이블 · AI 업무비서')
-    st.caption('자료를 이해하고, 내 업무의 근거·기한·진행 상태를 함께 정리합니다.')
+    for name, default in [('TEXT_MODEL','gpt-6-luna'), ('STT_MODEL','gpt-transcribe'), ('TTS_MODEL','tts-1'), ('IMAGE_MODEL','gpt-image-2.5-sunburst')]:
+        st.session_state.setdefault(name, setting(name, default))
+    st.session_state.setdefault('custom_role', SYS_ROLE)
+    st.session_state.setdefault('library', [])
+    st.session_state.setdefault('selected_sources', [])
+    st.session_state.setdefault('context_note', '')
+    st.session_state.setdefault('page', '채팅')
+    TEXT_MODEL, STT_MODEL, TTS_MODEL, IMAGE_MODEL = [st.session_state[x] for x in ['TEXT_MODEL','STT_MODEL','TTS_MODEL','IMAGE_MODEL']]
+    SYS_ROLE = st.session_state.custom_role
     with st.sidebar:
-        st.subheader('내 정보')
-        p = st.session_state.profile
-        st.session_state.profile = {k: st.text_input(k, value=p[k]) for k in ['이름', '직책', '소속']}
-        with st.expander('모델 설정'):
-            TEXT_MODEL = st.text_input('대화·분석 모델', value=setting('TEXT_MODEL', 'gpt-6-luna'))
-            STT_MODEL = st.text_input('음성 인식 모델', value=setting('STT_MODEL', 'gpt-transcribe'))
-            TTS_MODEL = st.text_input('음성 출력 모델', value=setting('TTS_MODEL', 'tts-1'))
-            IMAGE_MODEL = st.text_input('이미지 생성 모델', value=setting('IMAGE_MODEL', 'gpt-image-2.5-sunburst'))
-            st.caption('계정에서 사용 가능한 모델 ID로 변경하세요. 이미지는 Sunburst low 설정입니다. 계정의 모델 사용 권한을 확인하세요.')
-        speak = st.checkbox('답변을 음성으로도 생성', value=True)
-        st.caption('음성 생성은 추가 API 비용이 발생합니다.')
-        if st.button('대화·첨부 초기화'):
-            for key in ['history', 'records', 'previous_outputs', 'sources']:
-                st.session_state[key] = []
+        st.title('에이블')
+        if st.button('＋ 새 대화', use_container_width=True):
+            for name in ['history','records','sources','previous_outputs','selected_sources']:
+                st.session_state[name] = []
+            st.session_state.context_note = ''
+            st.session_state.page = '채팅'
             st.session_state.last_submission = ''
             st.rerun()
-        st.caption('업무는 별도로 유지됩니다. 최근 대화 5쌍을 모델에 전달합니다.')
-        st.info('재접속 시 기록이 초기화될 수 있습니다. 업무 관리 탭에서 백업하세요.')
+        nav = ['채팅','자료실','내 작업','팀원 조회','설정']
+        chosen = st.radio('메뉴', nav, index=nav.index(st.session_state.page))
+        if chosen != st.session_state.page:
+            st.session_state.page = chosen
+            st.rerun()
+        st.caption(st.session_state.profile['이름']+' · '+st.session_state.profile['소속'])
+        st.caption('현재 세션에 저장됩니다. 재시작 전 업무 백업을 다운로드하세요.')
     key = setting('OPENAI_API_KEY')
-    client = None  # 실제 요청 시에만 SDK/문서 라이브러리 로딩
-    if not key:
-        st.warning('Streamlit Secrets 또는 환경 변수에 OPENAI_API_KEY를 설정하면 실행할 수 있습니다.')
-    chat_tab, task_tab, guide_tab = st.tabs(['💬 요청·결과', '📋 내 업무·변경 사항', 'ℹ️ 사용 안내'])
-    with chat_tab:
-        with st.form('request_form', clear_on_submit=False):
-            uploaded = st.file_uploader('자료 첨부 · 선택', accept_multiple_files=True,
-                type=['txt','md','json','log','jpg','jpeg','png','webp','pdf','csv','tsv','xlsx','pptx','docx',
-                      'mp3','m4a','wav','webm','mp4','mpeg','mpga','ogg','flac'])
-            prompt_text = st.text_area('무엇을 도와드릴까요?', placeholder='회의록에서 내 업무와 기한을 정리하고 엑셀로 만들어 이메일로 보내줘.')
-            audio = st.audio_input('음성으로 요청 · 선택')
-            pdf_password = st.text_input('암호화 PDF 비밀번호 · 해당 시', type='password')
-            use_saved = st.checkbox('직전 첨부 자료를 함께 참고', value=True)
-            repeat = st.checkbox('동일한 입력을 새 요청으로 다시 실행', value=False)
-            submitted = st.form_submit_button('실행', type='primary', disabled=not key)
+    client = None
+    speak = st.session_state.get('auto_voice', False)
+    pdf_password = st.session_state.get('pdf_password', '')
+    use_saved = st.session_state.get('use_saved', True)
+    repeat = True
+    page = st.session_state.page
+    if page == '채팅':
+        st.title('에이블과 대화')
+        st.caption('파일 첨부·음성 입력·결과물 생성·이메일 요청을 아래 채팅창에서 처리합니다.')
+        for record in st.session_state.records:
+            render_record(record)
+        if st.session_state.context_note:
+            st.info('선택한 업무: '+st.session_state.context_note)
+            if st.button('선택한 업무 해제'):
+                st.session_state.context_note = ''
+                st.rerun()
+        if st.session_state.selected_sources:
+            st.caption('참고 자료: '+', '.join(Path(x).name for x in st.session_state.selected_sources))
+            if st.button('선택 자료 해제'):
+                st.session_state.selected_sources = []
+                st.rerun()
+        if not key:
+            st.warning('OPENAI_API_KEY 설정이 필요합니다.')
+        submission = st.chat_input('요청을 입력하세요. ＋로 파일을 첨부할 수 있습니다.', accept_file='multiple', accept_audio=True, disabled=not key)
+        submitted = submission is not None
+        uploaded = submission.files if submitted else []
+        audio = submission.audio if submitted else None
+        prompt_text = submission.text if submitted else ''
         if submitted:
             files = uploaded or []
             if not prompt_text.strip() and audio is None:
@@ -639,7 +672,9 @@ def main():
                                 prompt = (prompt + '\n' + transcript).strip()
                             if not prompt:
                                 raise ValueError('인식된 요청이 비어 있습니다.')
-                            sources = []
+                            if st.session_state.context_note:
+                                prompt += '\n선택한 업무 참고: '+st.session_state.context_note
+                            sources = [Path(x) for x in st.session_state.selected_sources if Path(x).is_file()]
                             for i, f in enumerate(files, 1):
                                 safe = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', f.name)
                                 target = request_dir/f'{i:02d}_{safe}'
@@ -655,14 +690,16 @@ def main():
                                 raise ValueError('이전 첨부를 포함한 파일 수/용량 한도를 초과했습니다. 직전 첨부 참고를 해제하세요.')
                             process(prompt, sources, request_id, speak)
                             st.session_state.sources = [str(p) for p in sources]
+                            st.session_state.library = list(dict.fromkeys(st.session_state.library + [str(p) for p in sources] + st.session_state.previous_outputs))
+                            st.rerun()
                     except Exception as exc:
                         st.error(f'처리하지 못했습니다 ({type(exc).__name__}). 입력 한도와 모델 ID·계정 권한을 확인하세요. 동일 입력 재시도는 재실행 항목을 선택하세요.')
                         if isinstance(exc, (ValueError, FileNotFoundError)):
                             st.caption(str(exc))
-        for record in st.session_state.records:
-            render_record(record)
-    with task_tab:
-        tasks = st.session_state.tasks
+    if page == '내 작업':
+        st.title('내 작업')
+        tasks = [t for t in st.session_state.tasks if st.session_state.profile['이름'] in t['owner']]
+        st.caption('담당자에 내 이름이 포함된 업무입니다. 전체 담당자별 업무는 팀원 조회에서 확인하세요.')
         c1, c2, c3 = st.columns(3)
         c1.metric('전체 업무', len(tasks))
         c2.metric('미완료', sum(t['status'] not in ['완료','취소'] for t in tasks))
@@ -677,6 +714,10 @@ def main():
                 st.write('선행 조건: '+t['dependency'])
                 st.caption('근거 파일: '+t['source'])
                 st.code(t['quote'], language=None)
+                if st.button('이 업무로 대화하기', key='talk_'+t['id']):
+                    st.session_state.context_note = json.dumps(t, ensure_ascii=False)
+                    st.session_state.page = '채팅'
+                    st.rerun()
                 status = st.selectbox('진행 상태', STATUSES, index=STATUSES.index(t['status']), key='status_'+t['id'])
                 if st.button('상태 저장', key='save_'+t['id']):
                     st.session_state.changes = [{'업무': t['title'], '변경': {'status': {'이전': t['status'], '현재': status}}}]
@@ -685,7 +726,7 @@ def main():
         if st.session_state.changes:
             st.write('최근 업무 변경')
             st.json(st.session_state.changes)
-        backup = json.dumps({'version': 1, 'tasks': tasks}, ensure_ascii=False, indent=2)
+        backup = json.dumps({'version': 1, 'tasks': st.session_state.tasks}, ensure_ascii=False, indent=2)
         st.download_button('업무 백업 다운로드', backup, file_name='able_tasks.json', mime='application/json')
         backup_file = st.file_uploader('업무 백업 불러오기 · 현재 업무를 교체합니다', type=['json'], key='backup')
         if st.button('백업으로 복원', disabled=backup_file is None):
@@ -699,30 +740,60 @@ def main():
             except (ValueError, TypeError, AttributeError):
                 st.error('유효한 에이블 업무 백업 파일이 아닙니다.')
     print('[ABLE] UI ready', flush=True)
-    with guide_tab:
-        st.markdown('''**사용 예시**
-- 파일 없이: “협력사에 보낼 정중한 영문 일정 문의 메일 초안을 작성해줘. 보내지는 마.”
-- 회의록 첨부: “내 업무를 근거와 함께 정리하고 미정인 기한을 알려줘.”
-- 후속 질문: “그중 먼저 해야 하는 일과 이유를 알려줘.”
-- 상태 변경: “경쟁사 분석 초안은 완료했어.”
-- 파일 생성: “이 자료를 바탕으로 엑셀 업무표와 PPT 5장을 만들어줘.”
-- 이메일: “방금 만든 파일을 이메일로 보내줘.”
-- 이미지: “회의에서 정한 제품 정보로 홍보 이미지를 생성해줘.”
-
-**지원 범위**
-문서 결과물은 텍스트 중심입니다. PPTX는 텍스트·표·삽입 이미지, DOCX는 텍스트·표를 읽습니다.
-정교한 페이지 배치·차트 분석이 필요하면 PDF로 첨부하세요. 음성은 STT 후 분석하며 화자 분리는 제공하지 않습니다.
-스캔/이미지 근거는 문자열 검증이 어려워 업무 자동 반영이 보류될 수 있습니다.
-새 회의를 비교할 때는 직전 첨부 참고를 해제하고 새 회의록을 올려도 저장 업무는 비교에 사용됩니다.
-
-**기록과 이메일**
-세션 동안 자료와 업무를 유지합니다. 서버 재시작·재접속에 대비해 업무 백업을 다운로드하세요.
-이메일은 현재 요청에 명시된 경우만 설정된 EMAIL_TO(없으면 GMAIL_ADDRESS)로 발송합니다.
-발송 의도는 모델 판정이므로 오판 가능성이 있으며 발표 전 금지/요약/발송 사례를 확인하세요.
-다른 버튼·다운로드·화면 재실행만으로는 처리나 이메일 발송이 반복되지 않습니다.
-''')
-        with st.expander('공통 역할 프롬프트'):
-            st.code(SYS_ROLE, language=None)
+    if page == '자료실':
+        st.title('자료실')
+        query = st.text_input('자료 검색')
+        paths = list(dict.fromkeys(st.session_state.library + st.session_state.sources + st.session_state.previous_outputs))
+        existing = [x for x in paths if Path(x).is_file() and query.casefold() in Path(x).name.casefold()]
+        if not existing:
+            st.info('채팅에서 파일을 첨부하거나 결과물을 생성하면 여기에 표시됩니다.')
+        for i, name in enumerate(existing):
+            p = Path(name)
+            with st.expander(p.name):
+                st.caption(f'{p.suffix.upper()} · {p.stat().st_size:,} bytes')
+                if p.suffix.lower() in ['.png','.jpg','.jpeg','.webp']:
+                    st.image(p.read_bytes())
+                elif p.suffix.lower() in ['.txt','.md','.csv','.json']:
+                    st.text(p.read_text(encoding='utf-8', errors='replace')[:5000])
+                st.download_button('다운로드', p.read_bytes(), p.name, key=f'lib_dl_{i}')
+                if st.button('이 자료로 대화하기', key=f'lib_chat_{i}'):
+                    st.session_state.selected_sources = [str(p)]
+                    st.session_state.page = '채팅'
+                    st.rerun()
+    if page == '팀원 조회':
+        st.title('팀원 조회')
+        st.caption('현재 자료에서 추출된 담당자별 업무와 기한입니다. 팀원 계정이나 외부 캘린더와 연동되어 있지 않습니다.')
+        owners = sorted(set(t['owner'] for t in st.session_state.tasks))
+        if not owners:
+            st.info('회의록을 채팅에서 분석하면 담당자별 업무를 확인할 수 있습니다.')
+        else:
+            owner = st.selectbox('담당자', owners)
+            rows = [t for t in st.session_state.tasks if t['owner'] == owner]
+            st.dataframe([{'업무':t['title'], '기한':t['deadline'], '상태':t['status'], '선행 조건':t['dependency']} for t in rows], use_container_width=True)
+            if st.button('이 담당자의 업무로 대화하기'):
+                st.session_state.context_note = json.dumps(rows, ensure_ascii=False)
+                st.session_state.page = '채팅'
+                st.rerun()
+    if page == '설정':
+        st.title('설정')
+        with st.form('settings'):
+            st.subheader('내 정보')
+            profile = {k:st.text_input(k, value=st.session_state.profile[k]) for k in ['이름','직책','소속']}
+            st.subheader('모델')
+            models = {k:st.text_input(label, value=st.session_state[k]) for k,label in [('TEXT_MODEL','대화·분석 모델 ID'),('IMAGE_MODEL','이미지 모델 ID'),('STT_MODEL','음성 인식 모델 ID'),('TTS_MODEL','음성 출력 모델 ID')]}
+            role = st.text_area('공통 프롬프트', value=st.session_state.custom_role, height=280)
+            voice = st.checkbox('답변 음성 자동 생성', value=st.session_state.get('auto_voice',False))
+            saved = st.checkbox('직전 첨부 자료 함께 참고', value=st.session_state.get('use_saved',True))
+            password = st.text_input('PDF 비밀번호', type='password', value=st.session_state.get('pdf_password',''))
+            st.caption('이메일은 요청 시 Secrets의 EMAIL_TO 또는 GMAIL_ADDRESS로 발송합니다.')
+            if st.form_submit_button('설정 저장'):
+                st.session_state.profile = profile
+                st.session_state.update(models)
+                st.session_state.custom_role = role
+                st.session_state.auto_voice = voice
+                st.session_state.use_saved = saved
+                st.session_state.pdf_password = password
+                st.rerun()
 
 
 if __name__ == '__main__':
