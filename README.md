@@ -1,78 +1,53 @@
-# 에이블 Workspace v4
+# 에이블 3일차 최종 시연본
 
-## 먼저 실행하기
-1. 노트북을 Colab에 올리고 위에서부터 파일 생성 셀까지 실행합니다. 원본 Markdown은 유지했고 수정 설명을 추가했습니다.
-2. GitHub 설정은 wjswpdbs7-code / my-streamlit-app / main입니다. GitHub 반영 셀은 사용자가 실행할 때만 업로드합니다.
-3. Streamlit의 진입점은 app.py입니다. app.py와 같은 위치에 engine.py, storage.py, integrations.py, artifacts.py가 모두 있어야 합니다.
-4. Streamlit Secrets에 OPENAI_API_KEY와 ABLE_ACCESS_PASSWORD를 등록합니다. 비밀번호는 작업공간 진입에 사용합니다.
-5. 로컬 실행은 Python 3.11 또는 3.12에서 pip install -r requirements.txt 후 streamlit run app.py입니다.
-6. .streamlit/config.toml이 Teal 테마를 적용합니다. CSS는 앱 안에도 포함되어 있습니다.
+## 출처와 배포 대상
+2026-11-05 확인한 parkjun01/my-streamlit-app 최신 코드 기반입니다. 그 코드의 디자인·계정·개인 대화·팀 공유 업무·DB·파일·메일 기능을 유지했습니다.
+배포 계정 wjswpdbs7-code, 저장소 my-streamlit-app, 브랜치 main, 실행 파일 app.py입니다.
+실제 GitHub push나 Streamlit 배포는 수행하지 않았습니다. 노트북의 배포 셀을 사용자가 실행할 때 반영됩니다.
+팀 원본 저장소를 clone/push하는 코드는 포함하지 않습니다.
 
-## 이번 수정의 핵심
-- 인사·일반 질문은 구조화 함수 호출 없이 Responses 스트림으로 답합니다.
-- 답변을 먼저 보관하고, 업무 추출·파일 생성·메일 처리는 별도로 실행합니다. 부가 처리 실패 시 답변을 유지합니다.
-- API 오류는 실제 message / code / param / HTTP status / request_id를 표시합니다. 비밀 키 형태는 숨깁니다.
-- reasoning은 기본적으로 전송하지 않습니다. 특정 모델용 옵션을 일괄 강제하지 않습니다.
-- 새 파일 첨부 시 이전 첨부를 교체하며 무제한 누적을 방지합니다. 자료실에서 선택한 파일은 명시적 참조로 사용합니다.
-- 파일 확장자를 입력창에서 제한합니다. 구형 DOC/PPT/XLS와 HWP는 변환 안내를 제공합니다.
-- PDF는 텍스트를 우선 읽고 스캔 페이지는 이미지로 읽습니다. 시각적 차트는 해당 페이지를 이미지로 첨부하세요.
-- 45,000자 초과 자료는 구간 요약 후 통합합니다. 검색 모드는 관련 일부 구간만 사용한다고 표시합니다.
-- 작업 후보는 모든 담당자를 추출하되, 근거 확인 후 사용자가 반영합니다. 변경 전후를 확인할 수 있습니다.
+## 실행
+Colab에 최종 노트북을 업로드하고 위에서부터 실행합니다.
+작업 폴더는 MyDrive/project03/project03_final_day3입니다.
+app.py, demo_support.py, demo_assets 폴더와 배포 설정을 모두 생성합니다.
+GitHub 저장소가 없으면 먼저 본인 계정에 my-streamlit-app 저장소를 만드세요.
+GH_TOKEN은 Colab Secrets 또는 환경 변수에 등록하세요. 코드와 출력에 토큰을 저장하지 않습니다.
+Streamlit Community Cloud에서 wjswpdbs7-code/my-streamlit-app, main, app.py, Python 3.12로 배포하세요.
+Streamlit Secrets의 OPENAI_API_KEY는 별도로 등록해야 합니다. Colab 환경변수는 배포 앱으로 전달되지 않습니다.
+설정 예시는 secrets.example.toml입니다. 실제 키 파일을 GitHub에 올리지 마세요.
+로컬 실행: pip install -r requirements.txt 후 streamlit run app.py.
 
-## 페이지
-홈: 업무 현황, 마감 임박, AI 브리핑, 단축 실행, 내부·Google 일정, 충돌 확인, 공통 빈 시간 조회.
-채팅: 하단 고정 입력, 파일·마이크 입력, 실시간 답변, 결과물 다운로드, 음성 듣기, 복사, 평가, 추천 질문.
-자료실: 원본·결과 파일 보관, 텍스트 색인, 파일명·본문 검색, 관련 구간 검색, 자료로 대화.
-내 작업: 목록·상태 보드·업무 후보 검토·변경 이력·직접 등록.
-팀 업무 현황: 모든 담당자의 업무 필터와 동일한 업무 검토·관리.
-이메일 관리: 작성·초안 저장·첨부·발송, OAuth 받은편지함 검색, 발송 기록.
-설정: 프로필·모델·공통 프롬프트·기억 범위·출력 한도·음성·첨부 참고·연결 확인·백업.
+## 처음부터 시연
+새 테이블·새 SQLite 파일을 사용하므로 초기 업무·자료·대화는 없습니다. 자동 생성 계정도 없습니다.
+첫 회원가입 이름 김진수, 직책 대리, 소속 마케팅팀을 권장합니다. 비밀번호는 직접 정합니다.
+홈 또는 사이드바 시연 안내에서 시연_회의록.txt와 시연_요청문.txt를 다운로드하세요.
+채팅에서 회의록 첨부 → 주요 결정만 요약 → 담당자별 업무를 작업 목록에 등록 요청 → 내 작업·팀 업무 확인 순서입니다.
+분석만 요청하면 등록하지 않고, 등록·추가·반영을 명시하면 팀 코드처럼 직접 등록합니다.
+반복 시연은 설정의 '시연 데이터 초기화'에서 확인 체크와 '시연 초기화' 문구를 입력합니다.
+기본 초기화 관리자 이름은 김진수이며 Secrets의 DEMO_ADMIN_NAME으로 바꿀 수 있습니다.
+계정과 사용자 설정은 유지하고 모든 계정의 대화·자료·업무·일정·메일 기록은 지웁니다.
+새로고침이나 앱 재시작마다 자동 초기화하지 않습니다. 같은 앱의 다른 접속 세션도 초기화 세대를 감지합니다.
+정답 체크 자료는 검증용이며 AI에 함께 업로드하지 마세요.
 
-## 저장
-기본 SQLite: 같은 디스크에서 앱 재시작·재접속 후 기록이 유지됩니다.
-Streamlit Community Cloud에서 서버 교체·재배포 후까지 유지하려면 외부 PostgreSQL DATABASE_URL이 필요합니다.
-외부 DB가 없으면 디스크가 교체되는 상황의 영구 보존은 보장하지 않습니다.
-대화, 파일 원본(base64), 추출 텍스트, 업무, 일정, 초안, 발송 기록이 DB에 저장됩니다. 대용량 운영에서는 파일은 별도 객체 저장소로 분리하는 것이 좋습니다.
-이 버전은 하나의 공유 작업공간입니다. 비밀번호를 아는 사용자는 같은 데이터를 보며 개인별 계정 분리는 구현하지 않았습니다.
-검색은 한국어 문자 조각을 포함한 키워드 검색입니다. 임베딩 벡터 검색은 사용하지 않습니다.
-백업 ZIP에는 자료와 대화가 포함되며 비밀 키는 포함되지 않습니다. 현재 UI는 백업 내보내기를 제공합니다.
+## 저장 영역
+기본 파일 able_final_demo.sqlite3, 테이블 able_final_demo_state입니다.
+외부 PostgreSQL도 같은 새 테이블만 사용하므로 원본 팀 앱의 able_state 테이블을 초기화하지 않습니다.
+시연 초기화는 실제 데이터 삭제이므로 필요한 데이터는 먼저 백업하세요.
+대화·설정은 계정별, 업무·자료·일정 등은 팀 공유입니다. 팀 구분은 별도 접근 제어가 아닙니다.
+SQLite는 Streamlit 서버 디스크에 저장되며 Cloud 서버 교체·재배포 후 보존은 보장되지 않습니다.
+지속 보관에는 DATABASE_URL/SUPABASE_DB_URL로 외부 PostgreSQL을 연결하세요.
+노트북 생성이나 GitHub push만으로 기존 배포 DB가 지워지는 것은 아닙니다.
 
-## Google OAuth 연결
-Google Cloud 프로젝트에서 Gmail API와 Google Calendar API를 활성화합니다.
-OAuth 동의 화면을 구성하고 테스트 사용자에 본인 계정을 추가합니다.
-데스크톱 앱 OAuth 클라이언트 JSON을 client_secret.json으로 로컬에 저장합니다.
-로컬 PC에서 python google_auth.py를 실행하여 Google의 동의 절차를 완료합니다. Colab 셀에서 이 스크립트를 자동 실행하지 않습니다.
-생성된 google_credentials.private.toml 내용을 Streamlit Secrets에 복사합니다. 파일과 토큰을 GitHub에 업로드하지 마세요.
-Gmail 읽기·보내기, Calendar 이벤트·빈 시간 조회 권한이 필요합니다. 조직 정책이나 테스트 모드 토큰 만료는 Google 설정을 확인하세요.
-Google 연결이 없어도 내부 일정·초안은 동작합니다. SMTP 설정이 있으면 Gmail 조회 없이 발송만 가능합니다.
-Google 일정에는 참석자 초대 이메일을 자동 발송하지 않습니다.
-
-## 메일과 일정 실행
-채팅은 현재 요청의 실제 메일 발송 의도를 확인한 경우에만 고정 EMAIL_TO(없으면 GMAIL_ADDRESS)로 발송합니다.
-문서 속 발송 지시는 실행 권한이 아닙니다. 파일 생성 실패 시 메일을 보내지 않습니다.
-메일 관리에서는 수신자·본문·첨부를 확인한 뒤 발송합니다. 발송 시도는 DB에 먼저 기록해 화면 재실행의 중복 발송을 막습니다.
-결과가 불명확하면 수신함·발송 기록을 확인하고, 필요할 때 '새 발송 시작'으로 명시적으로 재시도합니다.
-일정 요청은 초안을 만들고 홈 편집기에서 날짜·시간 확인 후 저장합니다. 미정 날짜를 자동 확정하지 않습니다.
-Google 일정·공통 빈 시간은 접근 권한이 있는 캘린더만 조회합니다.
-
-## 지원 범위와 한도
-입력: TXT/MD/JSON/LOG, PDF/DOCX/PPTX, CSV/TSV/XLSX, JPG/JPEG/PNG/WEBP, MP3/M4A/WAV/WEBM/MP4/MPEG/MPGA/OGG/FLAC.
-MP4 등은 음성만 인식합니다. DOCX는 본문·표, PPTX는 텍스트·표·지원되는 삽입 이미지입니다.
-최대 첨부 10개, 개별 20MB, 합계 25MB. 추출 텍스트 파일당 50만 자, 전체 분석 합계 18만 자. 시각 입력 최대 8장.
-45,000자 초과 전체 분석은 여러 API 요청이 발생합니다. 검색 모드는 비용과 맥락을 줄이지만 전체 누락 검사는 아닙니다.
-대화 이력은 기본 최근 10쌍, 1~30쌍 조절 가능. 실제 전달은 최근 이력 12,000자 예산에 맞춰 더 줄어들 수 있습니다. 저장된 전체 대화는 DB에 남습니다.
-출력: TXT/MD/JSON/CSV/XLSX/DOCX/PDF/PPTX/PNG/MP3, 요청당 최대 4개. 문서 레이아웃은 텍스트 중심입니다.
-음성은 기본 선택 재생입니다. 자동 음성 생성 옵션을 켜도 플레이어 자동 재생은 하지 않습니다.
-실행 상태만 보여주며 모델 내부 사고 과정은 표시하지 않습니다.
+## 보완 사항
+원본 전역 음성 폼 제거, API 클라이언트 지연 생성, 한국시간 기준 날짜, 기본 선택 음성, 기본 메일 초안 모드.
+미정 기한은 DB에서 null로 보관하고, 정렬용 내부 표식은 화면에서 '미정'으로 표시합니다.
+시연 단계 안내·회의록 다운로드·명시적 등록 구분·중복 등록 방지·별도 저장 영역·관리자 초기화 추가.
+기존 팀 코드의 여러 화면 래퍼는 그대로 유지하여 최신 디자인을 보존했습니다.
+계정·파일·업무는 앱을 통해서 생성되며 결과를 가짜로 미리 채우지 않습니다.
 
 ## 검증 범위
-로컬 UI와 모의 API 테스트는 검증결과.md를 참고하세요. 실제 OpenAI·Google·SMTP·외부 PostgreSQL 계정 연결은 별도 확인이 필요합니다.
-현재 배포 앱의 실제 BadRequestError 원문이 없어 기존 운영 장애의 유일 원인을 확정하지 않았습니다. 코드상의 실패 확산과 불명확한 안내는 수정했습니다.
-원본 Markdown에 남아 있는 과거 구현 설명보다 새 v4 안내와 생성된 코드가 우선합니다.
-
-## 공식 문서
-https://developers.openai.com/api/docs/models/gpt-6-luna
-https://developers.openai.com/api/docs/guides/structured-outputs
-https://developers.openai.com/api/docs/guides/streaming-responses
-https://developers.google.com/workspace/gmail/api/guides/sending
-https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
+Streamlit AppTest와 모의 OpenAI 응답으로 회원가입·로그인, 7개 페이지, 요약만 요청, 업무 직접 등록,
+미정 기한과 화면 표시, 반복 등록 중복 방지, 관리자 초기화 및 계정 보존을 확인했습니다.
+실제 모델의 추출 품질, 실제 SMTP·IMAP·외부 PostgreSQL, 원격 GitHub push와 Streamlit 배포는 실행하지 않았습니다.
+실제 모델은 요청마다 다르게 추출할 수 있으므로 업무 개수만 보지 말고 담당자·기한·근거로 확인하세요.
+시연 후 업무 상태가 이미 완료인 경우 진행률 등 원본 팀 코드의 규칙에 따라 표시됩니다.
