@@ -3,8 +3,6 @@ api_key.txt
 .streamlit/secrets.toml
 __pycache__/
 .ipynb_checkpoints/
-*.sqlite3
-*.sqlite3-*
 able_final_demo_settings.json
 able_data.json
 library/
